@@ -19,6 +19,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Work Sans",system-ui,sans-serif}
 main{max-width:460px;margin:0 auto;padding:10px 14px 14px}
+.modes{display:flex;gap:6px;margin-bottom:6px}.modes button{flex:1;min-height:34px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;font:600 14px "Work Sans",sans-serif;cursor:pointer}.modes button[aria-pressed="true"]{background:var(--red);color:#fff;border-color:var(--red)}
 .levels{display:flex;gap:6px;margin-bottom:8px}
 .levels button{flex:1;min-height:38px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;font:600 15px "Work Sans",sans-serif;cursor:pointer}
 .levels button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -48,6 +49,7 @@ button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 </head>
 <body>
 <main>
+<div class="modes" id="modes" role="group" aria-label="Game"><button type="button" aria-pressed="true">Mixed</button><button type="button" aria-pressed="false">Doubles &amp; trebles</button></div>
 <div class="levels" id="levels" role="group" aria-label="Level"></div>
 <div class="stats">
 <span>Score<b id="score">0</b></span>
@@ -68,7 +70,7 @@ button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 <script>
 var NAMES=["Warm-up","Club","League","Pro","Final"];
 var MUL={S:1,D:2,T:3};
-var S={level:1,score:0,streak:0,run:0,miss:0,cur:null,done:false,input:"",last:""};
+var S={dt:false,level:1,score:0,streak:0,run:0,miss:0,cur:null,done:false,input:"",last:""};
 function R(a,b){return a+Math.floor(Math.random()*(b-a+1));}
 function dart(max,types){var t=types[R(0,types.length-1)],n=R(1,max);return{t:t,n:n,v:MUL[t]*n,l:t+n};}
 function darts(k,max,types){var a=[];for(var i=0;i<k;i++)a.push(dart(max,types));return a;}
@@ -77,30 +79,36 @@ function chips(a){return a.map(function(d){return '<span class="chip '+d.t+'">'+
 function working(a){return a.map(function(d){return d.l+' = '+d.v;}).join(', ');}
 
 function gScore(L){
- var k=[1,2,3,3,3][L-1],mx=[10,12,12,20,20][L-1],ty=L===1?["D","T"]:["S","D","T"];
+ var k=[1,2,3,3,3][L-1],mx=[10,12,12,20,20][L-1],ty=(L===1||S.dt)?["D","T"]:["S","D","T"];
  var a=darts(k,mx,ty),t=sum(a);
  return{mode:"Dart total",q:"Add up the darts. What's the total?",chips:chips(a),ans:t,work:working(a)+" → "+t,hint:"Work out each dart first: S is ×1, D is ×2, T is ×3. Start with "+a[0].l+" = "+a[0].v+", then add the next dart."};
 }
 function gCount(L){
  var cfg=[[1,20,["S"],21,40],[1,20,["D","T"],41,100],[2,20,["S","D","T"],101,200],[3,20,["S","D","T"],201,301],[3,20,["S","D","T"],301,501]][L-1];
  var a,t,tries=0;
- do{a=darts(cfg[0],cfg[1],cfg[2]);t=sum(a);tries++;}while(t>=cfg[4]-1&&tries<60);
+ do{a=darts(cfg[0],cfg[1],ft(cfg[2]));t=sum(a);tries++;}while(t>=cfg[4]-1&&tries<60);
  var lo=Math.max(cfg[3],t+1),hi=Math.max(lo,cfg[4]),st=R(lo,hi);
  return{mode:"Countdown",q:"You need <b>"+st+"</b>. You throw:",chips:chips(a),ans:st-t,hint:"Add up your darts first ("+working(a)+"), then take that total away from "+st+".",work:"Throws total "+sum(a)+" ("+working(a)+"). "+st+" − "+t+" = "+(st-t)};
 }
 function gCheck(L){
  var d=R(1,20),first,r,w;
  if(L===1){r=2*d;return{mode:"Checkout",q:"You need <b>"+r+"</b>. Which double finishes? (D?)",chips:"",ans:d,hint:"A double is the number ×2, so halve "+r+" to find the number.",work:r+" ÷ 2 = "+d};}
- if(L===2)first=darts(1,20,["S"]);
+ if(L===2)first=darts(1,20,ft(["S"]));
  else if(L===3)first=darts(1,20,["T"]);
- else first=darts(2,20,L===4?["S","D","T"]:["D","T"]);
+ else first=darts(2,20,L===4?ft(["S","D","T"]):["D","T"]);
  var f=sum(first);r=f+2*d;
  return{mode:"Checkout",q:"You need <b>"+r+"</b>. You throw:",chips:chips(first)+'<span class="plus">then</span>',ans:d,hint:"Take your throw ("+f+") away from "+r+", then halve what is left.",work:r+" − "+f+" = "+(2*d)+", ÷ 2 = D"+d,sub:"Which double finishes? (D?)"};
 }
-var GEN=[gScore,gCount,gCheck];
+function ft(t){if(!S.dt)return t;var r=t.filter(function(x){return x!=="S";});return r.length?r:["D","T"];}
+function gRing(L){
+ var mx=[10,12,15,20,20][L-1],t=R(0,1)?"D":"T",n=R(1,mx),m=MUL[t],v=m*n,nm=t==="D"?"double":"treble";
+ if(L>1&&R(0,1)){return{mode:"Which number",q:"Which "+nm+" is worth <b>"+v+"</b>? ("+t+"?)",chips:"",ans:n,hint:"A "+nm+" is the number ×"+m+", so divide "+v+" by "+m+".",work:v+" ÷ "+m+" = "+n+" → "+t+n};}
+ return{mode:"Ring value",q:"What is this worth?",chips:chips([{t:t,n:n,v:v,l:t+n}]),ans:v,hint:"A "+nm+" is the number ×"+m+": "+n+" × "+m+".",work:t+n+" = "+n+" × "+m+" = "+v};
+}
+function gens(){return S.dt?[gRing,gRing,gScore,gCount,gCheck]:[gScore,gCount,gCheck];}
 function next(){
  var g,tries=0;
- do{g=GEN[R(0,GEN.length-1)](S.level);tries++;}while(g.mode===S.last&&tries<8);
+ do{var G=gens();g=G[R(0,G.length-1)](S.level);tries++;}while(g.mode===S.last&&tries<8);
  S.last=g.mode;S.cur=g;S.done=false;S.input="";
  $("mode").textContent=g.mode+" · "+NAMES[S.level-1];
  $("q").innerHTML=g.q;
@@ -151,6 +159,8 @@ function press(k){
   else if(e.key==="Backspace")press("del");
   else if(e.key==="Enter"){e.preventDefault();press("go");}
  });
+ var mb=$("modes").children;
+ for(i=0;i<mb.length;i++){(function(n){mb[n].onclick=function(){S.dt=n===1;S.run=0;S.miss=0;S.streak=0;for(var j=0;j<mb.length;j++)mb[j].setAttribute("aria-pressed",String(j===n));paintStats();next();};})(i);}
  paintStats();next();
 })();
 </script>
