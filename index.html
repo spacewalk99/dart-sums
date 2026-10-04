@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dart Sums">
+<title>Dart Sums</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Work+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef0e6;--panel:#fff;--ink:#12261d;--muted:#526b5d;--line:#c8d2c6;--red:#c8362f;--green:#1f8a4c;--onacc:#fff;--single:#e9e2c8;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10231b;--panel:#173227;--ink:#eef0e6;--muted:#9db3a6;--line:#2b4a3b;--red:#e0463d;--green:#3fae6c;--single:#d9d2b4}}
+:root[data-theme="dark"]{--bg:#10231b;--panel:#173227;--ink:#eef0e6;--muted:#9db3a6;--line:#2b4a3b;--red:#e0463d;--green:#3fae6c;--single:#d9d2b4}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Work Sans",system-ui,sans-serif}
+main{max-width:460px;margin:0 auto;padding:14px 14px 24px}
+h1{font:700 26px/1 Oswald,Impact,sans-serif;margin:4px 0 12px;letter-spacing:.02em}
+.levels{display:flex;gap:6px;margin-bottom:12px}
+.levels button{flex:1;min-height:44px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;font:600 15px "Work Sans",sans-serif;cursor:pointer}
+.levels button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.stats{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;color:var(--muted)}
+.stats b{font:700 20px Oswald,sans-serif;color:var(--ink);margin-left:4px}
+.dots{display:flex;gap:5px}.dots i{width:12px;height:12px;border-radius:50%;border:2px solid var(--line)}.dots i.on{background:var(--green);border-color:var(--green)}
+.card{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:16px;min-height:178px}
+.mode{font:600 14px "Work Sans",sans-serif;color:var(--muted);margin:0 0 6px}
+.q{font:500 22px/1.35 Oswald,sans-serif;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px;align-items:center}
+.chip{display:inline-flex;align-items:center;justify-content:center;min-width:56px;height:56px;padding:0 10px;border-radius:28px;font:700 22px Oswald,sans-serif;color:#10231b;background:var(--single);border:3px solid var(--ink)}
+.chip.D{background:var(--green);color:#fff}.chip.T{background:var(--red);color:#fff}
+.plus{font:700 22px Oswald,sans-serif;color:var(--muted)}
+.legend{font-size:13px;color:var(--muted);margin:10px 2px 0}
+.ans{margin:12px 0 8px;height:64px;border-bottom:3px solid var(--ink);display:flex;align-items:flex-end;justify-content:center;font:700 44px/1.1 Oswald,sans-serif}
+.ans.ok{color:var(--green)}.ans.bad{color:var(--red)}
+.fb{min-height:52px;margin:0 0 8px;font-size:15px}
+.fb strong{font-weight:600}
+.hint{display:block;width:100%;min-height:44px;margin:0 0 8px;border:1.5px dashed var(--line);background:transparent;color:var(--ink);border-radius:10px;font:600 15px "Work Sans",sans-serif;cursor:pointer}.hint:disabled{opacity:.45;cursor:default}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{min-height:58px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);font:700 24px Oswald,sans-serif;cursor:pointer}
+.pad button:active{transform:scale(.97)}
+.pad .go{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<h1>Dart Sums</h1>
+<div class="levels" id="levels" role="group" aria-label="Level"></div>
+<div class="stats">
+<span>Score<b id="score">0</b></span>
+<span>Streak<b id="streak">0</b></span>
+<span class="dots" id="dots" aria-label="Correct answers towards next level"></span>
+</div>
+<section class="card">
+<p class="mode" id="mode"></p>
+<p class="q" id="q"></p>
+<div class="chips" id="chips"></div>
+<p class="legend">S = single, <span style="color:var(--green);font-weight:600">D</span> = double (×2), <span style="color:var(--red);font-weight:600">T</span> = treble (×3)</p>
+</section>
+<div class="ans" id="ans" aria-live="polite"></div>
+<p class="fb" id="fb" aria-live="polite"></p>
+<button class="hint" id="hint" type="button">Hint</button>
+<div class="pad" id="pad"></div>
+</main>
+<script>
+var NAMES=["Warm-up","Club","League","Pro","Final"];
+var MUL={S:1,D:2,T:3};
+var S={level:1,score:0,streak:0,run:0,miss:0,cur:null,done:false,input:"",last:""};
+function R(a,b){return a+Math.floor(Math.random()*(b-a+1));}
+function dart(max,types){var t=types[R(0,types.length-1)],n=R(1,max);return{t:t,n:n,v:MUL[t]*n,l:t+n};}
+function darts(k,max,types){var a=[];for(var i=0;i<k;i++)a.push(dart(max,types));return a;}
+function sum(a){return a.reduce(function(s,d){return s+d.v;},0);}
+function chips(a){return a.map(function(d){return '<span class="chip '+d.t+'">'+d.l+'</span>';}).join('<span class="plus">+</span>');}
+function working(a){return a.map(function(d){return d.l+' = '+d.v;}).join(', ');}
+
+function gScore(L){
+ var k=[1,2,3,3,3][L-1],mx=[10,12,12,20,20][L-1],ty=L===1?["D","T"]:["S","D","T"];
+ var a=darts(k,mx,ty),t=sum(a);
+ return{mode:"Dart total",q:"Add up the darts. What's the total?",chips:chips(a),ans:t,work:working(a)+" → "+t,hint:"Work out each dart first: S is ×1, D is ×2, T is ×3. Start with "+a[0].l+" = "+a[0].v+", then add the next dart."};
+}
+function gCount(L){
+ var cfg=[[1,20,["S"],21,40],[1,20,["D","T"],41,100],[2,20,["S","D","T"],101,200],[3,20,["S","D","T"],201,301],[3,20,["S","D","T"],301,501]][L-1];
+ var a,t,tries=0;
+ do{a=darts(cfg[0],cfg[1],cfg[2]);t=sum(a);tries++;}while(t>=cfg[4]-1&&tries<60);
+ var lo=Math.max(cfg[3],t+1),hi=Math.max(lo,cfg[4]),st=R(lo,hi);
+ return{mode:"Countdown",q:"You need <b>"+st+"</b>. You throw:",chips:chips(a),ans:st-t,hint:"Add up your darts first ("+working(a)+"), then take that total away from "+st+".",work:"Throws total "+sum(a)+" ("+working(a)+"). "+st+" − "+t+" = "+(st-t)};
+}
+function gCheck(L){
+ var d=R(1,20),first,r,w;
+ if(L===1){r=2*d;return{mode:"Checkout",q:"You need <b>"+r+"</b>. Which double finishes? (D?)",chips:"",ans:d,hint:"A double is the number ×2, so halve "+r+" to find the number.",work:r+" ÷ 2 = "+d};}
+ if(L===2)first=darts(1,20,["S"]);
+ else if(L===3)first=darts(1,20,["T"]);
+ else first=darts(2,20,L===4?["S","D","T"]:["D","T"]);
+ var f=sum(first);r=f+2*d;
+ return{mode:"Checkout",q:"You need <b>"+r+"</b>. You throw:",chips:chips(first)+'<span class="plus">then</span>',ans:d,hint:"Take your throw ("+f+") away from "+r+", then halve what is left.",work:r+" − "+f+" = "+(2*d)+", ÷ 2 = D"+d,sub:"Which double finishes? (D?)"};
+}
+var GEN=[gScore,gCount,gCheck];
+function next(){
+ var g,tries=0;
+ do{g=GEN[R(0,GEN.length-1)](S.level);tries++;}while(g.mode===S.last&&tries<8);
+ S.last=g.mode;S.cur=g;S.done=false;S.input="";
+ $("mode").textContent=g.mode+" · "+NAMES[S.level-1];
+ $("q").innerHTML=g.q;
+ $("chips").innerHTML=g.chips+(g.sub?'<span style="flex-basis:100%;font:500 18px Oswald,sans-serif;color:var(--muted)">'+g.sub+'</span>':"");
+ $("fb").textContent="";$("ans").textContent="";$("ans").className="ans";
+ $("go").textContent="✓";$("hint").disabled=false;
+}
+function $(id){return document.getElementById(id);}
+function paintStats(){
+ $("score").textContent=S.score;$("streak").textContent=S.streak;
+ var h="";for(var i=0;i<5;i++)h+='<i class="'+(i<S.run?"on":"")+'"></i>';$("dots").innerHTML=h;
+ var b=$("levels").children;for(var j=0;j<b.length;j++)b[j].setAttribute("aria-pressed",String(j+1===S.level));
+}
+function submit(){
+ if(S.done){next();return;}
+ if(S.input==="")return;
+ var ok=parseInt(S.input,10)===S.cur.ans,msg;
+ S.done=true;
+ if(ok){
+  S.streak++;S.run++;S.miss=0;S.score+=10*S.level;
+  msg="<strong>Correct!</strong> "+S.cur.work;
+  if(S.run>=5&&S.level<5){S.level++;S.run=0;msg="<strong>Level up!</strong> Now at "+NAMES[S.level-1]+".";}
+  else if(S.run>=5){S.run=0;}
+  $("ans").className="ans ok";
+ }else{
+  S.streak=0;S.miss++;
+  msg="<strong>Not quite.</strong> Answer: "+S.cur.ans+". "+S.cur.work;
+  if(S.miss>=3&&S.level>1){S.level--;S.run=0;S.miss=0;msg+=" <strong>Dropping to "+NAMES[S.level-1]+" for more practice.</strong>";}
+  $("ans").className="ans bad";
+ }
+ $("fb").innerHTML=msg;$("go").textContent="Next";$("hint").disabled=true;paintStats();
+}
+function press(k){
+ if(k==="go"){submit();return;}
+ if(S.done)return;
+ if(k==="del")S.input=S.input.slice(0,-1);
+ else if(S.input.length<4)S.input+=k;
+ $("ans").textContent=S.input;
+}
+(function init(){
+ var lv=$("levels"),i;
+ for(i=1;i<=5;i++){(function(n){var b=document.createElement("button");b.textContent=n;b.title=NAMES[n-1];b.setAttribute("aria-label","Level "+n+", "+NAMES[n-1]);b.onclick=function(){S.level=n;S.run=0;S.miss=0;paintStats();next();};lv.appendChild(b);})(i);}
+ $("hint").onclick=function(){if(!S.done){$("fb").innerHTML="<strong>Hint:</strong> "+S.cur.hint;}};
+ var pad=$("pad"),keys=["1","2","3","4","5","6","7","8","9","del","0","go"];
+ keys.forEach(function(k){var b=document.createElement("button");b.textContent=k==="del"?"⌫":k==="go"?"✓":k;b.setAttribute("aria-label",k==="del"?"Delete":k==="go"?"Submit":k);if(k==="go"){b.className="go";b.id="go";}b.onclick=function(){press(k);};pad.appendChild(b);});
+ document.addEventListener("keydown",function(e){
+  if(/^[0-9]$/.test(e.key))press(e.key);
+  else if(e.key==="Backspace")press("del");
+  else if(e.key==="Enter"){e.preventDefault();press("go");}
+ });
+ paintStats();next();
+})();
+</script>
+</body>
+</html>
