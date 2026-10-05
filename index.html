@@ -26,6 +26,8 @@ main{max-width:460px;margin:0 auto;padding:10px 14px 14px}
 .stats{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;color:var(--muted)}
 .stats b{font:700 18px Oswald,sans-serif;color:var(--ink);margin-left:4px}
 .dots{display:flex;gap:5px}.dots i{width:12px;height:12px;border-radius:50%;border:2px solid var(--line)}.dots i.on{background:var(--green);border-color:var(--green)}
+.tbar{height:5px;background:var(--line);border-radius:3px;margin:-2px 0 8px;overflow:hidden;display:none}.tbar i{display:block;height:100%;width:100%;background:var(--red)}
+.levels .tm[aria-pressed="true"]{background:var(--red);border-color:var(--red);color:#fff}
 .card{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:12px 14px;min-height:0}
 .mode{font:600 14px "Work Sans",sans-serif;color:var(--muted);margin:0 0 6px}
 .q{font:500 19px/1.3 Oswald,sans-serif;margin:0}
@@ -54,8 +56,10 @@ button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 <div class="stats">
 <span>Score<b id="score">0</b></span>
 <span>Streak<b id="streak">0</b></span>
-<span class="dots" id="dots" aria-label="Correct answers towards next level"></span>
+<span><span id="bestl">Best streak</span><b id="best">0</b></span>
+<span class="dots" id="dots" aria-label="Correct answers towards next level"></span><b id="time" style="display:none;margin:0">60s</b>
 </div>
+<div class="tbar" id="tbar"><i id="tfill"></i></div>
 <section class="card">
 <p class="mode" id="mode"></p>
 <p class="q" id="q"></p>
@@ -70,7 +74,7 @@ button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 <script>
 var NAMES=["Warm-up","Club","League","Pro","Final"];
 var MUL={S:1,D:2,T:3};
-var S={dt:false,level:1,score:0,streak:0,run:0,miss:0,cur:null,done:false,input:"",last:""};
+var S={dt:false,level:1,score:0,streak:0,run:0,miss:0,cur:null,done:false,input:"",last:"",timed:false,running:false,timeLeft:60,right:0,total:0,qStart:0,auto:null};
 function R(a,b){return a+Math.floor(Math.random()*(b-a+1));}
 function dart(max,types){var t=types[R(0,types.length-1)],n=R(1,max);return{t:t,n:n,v:MUL[t]*n,l:t+n};}
 function darts(k,max,types){var a=[];for(var i=0;i<k;i++)a.push(dart(max,types));return a;}
@@ -109,39 +113,98 @@ function gens(){return S.dt?[gRing,gRing,gScore,gCount,gCheck]:[gScore,gCount,gC
 function next(){
  var g,tries=0;
  do{var G=gens();g=G[R(0,G.length-1)](S.level);tries++;}while(g.mode===S.last&&tries<8);
- S.last=g.mode;S.cur=g;S.done=false;S.input="";
+ clearTimeout(S.auto);
+ S.last=g.mode;S.cur=g;S.done=false;S.input="";S.qStart=Date.now();
  $("mode").textContent=g.mode+" · "+NAMES[S.level-1];
  $("q").innerHTML=g.q;
  $("chips").innerHTML=g.chips+(g.sub?'<span style="flex-basis:100%;font:500 18px Oswald,sans-serif;color:var(--muted)">'+g.sub+'</span>':"");
  $("fb").textContent="";$("ans").textContent="";$("ans").className="ans";
- $("go").textContent="✓";$("hint").disabled=false;
+ $("go").textContent="✓";$("hint").disabled=S.timed;
 }
 function $(id){return document.getElementById(id);}
+var BK="dartsums.bests.v1",B={},tickLast=0;
+function loadB(){try{B=JSON.parse(localStorage.getItem(BK))||{};}catch(e){B={};}}
+function saveB(){try{localStorage.setItem(BK,JSON.stringify(B));}catch(e){}}
+function bestKey(){return "t"+(S.dt?"d":"m")+S.level;}
+function paintTime(){var t=Math.max(0,S.timeLeft);$("time").textContent=Math.ceil(t)+"s";$("tfill").style.width=(t/60*100)+"%";}
 function paintStats(){
  $("score").textContent=S.score;$("streak").textContent=S.streak;
+ $("bestl").textContent=S.timed?"Best":"Best streak";
+ $("best").textContent=S.timed?(B[bestKey()]||0):(B.streak||0);
  var h="";for(var i=0;i<5;i++)h+='<i class="'+(i<S.run?"on":"")+'"></i>';$("dots").innerHTML=h;
- var b=$("levels").children;for(var j=0;j<b.length;j++)b[j].setAttribute("aria-pressed",String(j+1===S.level));
+ $("dots").style.display=S.timed?"none":"flex";
+ $("time").style.display=S.timed?"inline":"none";
+ $("tbar").style.display=S.timed?"block":"none";
+ var b=$("levels").children;for(var j=0;j<5;j++)b[j].setAttribute("aria-pressed",String(j+1===S.level));
+ b[5].setAttribute("aria-pressed",String(S.timed));
+ if(S.timed)paintTime();
+}
+function resetRun(){S.run=0;S.miss=0;S.streak=0;}
+function showReady(){
+ S.done=true;S.input="";
+ $("mode").textContent="60-second round · "+(S.dt?"Doubles & trebles":"Mixed")+" · Level "+S.level;
+ $("q").innerHTML="Answer as many as you can. Quick answers earn bonus points.";
+ $("chips").innerHTML="";$("fb").textContent="";$("ans").textContent="";$("ans").className="ans";
+ $("go").textContent="Start";$("hint").disabled=true;
+}
+function setTimed(on){
+ clearTimeout(S.auto);S.timed=on;S.running=false;S.score=0;resetRun();S.timeLeft=60;
+ if(on)showReady();else next();
+ paintStats();
+}
+function settingsChanged(){
+ B.level=S.level;B.dt=S.dt;saveB();
+ if(S.timed){setTimed(true);}else{resetRun();paintStats();next();}
+}
+function startRound(){
+ S.score=0;resetRun();S.right=0;S.total=0;S.timeLeft=60;S.running=true;tickLast=Date.now();
+ next();paintStats();
+}
+function endRound(){
+ S.running=false;clearTimeout(S.auto);
+ var k=bestKey(),prev=B[k]||0,nb=S.score>prev;
+ if(nb){B[k]=S.score;saveB();}
+ var acc=S.total?Math.round(100*S.right/S.total):0;
+ $("mode").textContent="Time's up!";
+ $("q").innerHTML="Score <b>"+S.score+"</b>"+(nb?" · New best!":" · Best "+prev);
+ $("chips").innerHTML="";
+ $("fb").textContent=S.right+" correct out of "+S.total+" ("+acc+"%).";
+ $("ans").textContent="";$("ans").className="ans";
+ $("go").textContent="Again";$("hint").disabled=true;S.done=true;
+ paintStats();
+}
+function tick(){
+ var now=Date.now(),d=Math.min(now-tickLast,500);tickLast=now;
+ if(!S.timed||!S.running||S.done)return;
+ S.timeLeft-=d/1000;
+ if(S.timeLeft<=0){S.timeLeft=0;endRound();return;}
+ paintTime();
 }
 function submit(){
- if(S.done){next();return;}
+ if(S.done){clearTimeout(S.auto);next();return;}
  if(S.input==="")return;
  var ok=parseInt(S.input,10)===S.cur.ans,msg;
  S.done=true;
+ if(S.timed)S.total++;
  if(ok){
-  S.streak++;S.run++;S.miss=0;S.score+=10*S.level;
-  msg="<strong>Correct!</strong> "+S.cur.work;
-  if(S.run>=5&&S.level<5){S.level++;S.run=0;msg="<strong>Level up!</strong> Now at "+NAMES[S.level-1]+".";}
+  var sec=(Date.now()-S.qStart)/1000,bonus=Math.max(0,5-Math.floor(sec))*S.level,pts=10*S.level+bonus;
+  S.streak++;S.run++;S.miss=0;S.score+=pts;if(S.timed)S.right++;
+  if(S.streak>(B.streak||0)){B.streak=S.streak;saveB();}
+  msg="<strong>Correct!</strong> +"+pts+(bonus?" (speed +"+bonus+")":"")+". "+S.cur.work;
+  if(!S.timed&&S.run>=5&&S.level<5){S.level++;S.run=0;msg="<strong>Level up!</strong> Now at "+NAMES[S.level-1]+".";B.level=S.level;saveB();}
   else if(S.run>=5){S.run=0;}
   $("ans").className="ans ok";
  }else{
   S.streak=0;S.miss++;
   msg="<strong>Not quite.</strong> Answer: "+S.cur.ans+". "+S.cur.work;
-  if(S.miss>=3&&S.level>1){S.level--;S.run=0;S.miss=0;msg+=" <strong>Dropping to "+NAMES[S.level-1]+" for more practice.</strong>";}
+  if(!S.timed&&S.miss>=3&&S.level>1){S.level--;S.run=0;S.miss=0;msg+=" <strong>Dropping to "+NAMES[S.level-1]+" for more practice.</strong>";B.level=S.level;saveB();}
   $("ans").className="ans bad";
  }
  $("fb").innerHTML=msg;$("go").textContent="Next";$("hint").disabled=true;paintStats();
+ if(S.timed){S.auto=setTimeout(function(){if(S.running&&S.done)next();},ok?700:1800);}
 }
 function press(k){
+ if(S.timed&&!S.running){if(k==="go")startRound();return;}
  if(k==="go"){submit();return;}
  if(S.done)return;
  if(k==="del")S.input=S.input.slice(0,-1);
@@ -149,9 +212,13 @@ function press(k){
  $("ans").textContent=S.input;
 }
 (function init(){
+ loadB();
+ if(B.level>=1&&B.level<=5)S.level=B.level;
+ S.dt=!!B.dt;
  var lv=$("levels"),i;
- for(i=1;i<=5;i++){(function(n){var b=document.createElement("button");b.textContent=n;b.title=NAMES[n-1];b.setAttribute("aria-label","Level "+n+", "+NAMES[n-1]);b.onclick=function(){S.level=n;S.run=0;S.miss=0;paintStats();next();};lv.appendChild(b);})(i);}
- $("hint").onclick=function(){if(!S.done){$("fb").innerHTML="<strong>Hint:</strong> "+S.cur.hint;}};
+ for(i=1;i<=5;i++){(function(n){var b=document.createElement("button");b.textContent=n;b.title=NAMES[n-1];b.setAttribute("aria-label","Level "+n+", "+NAMES[n-1]);b.onclick=function(){S.level=n;settingsChanged();};lv.appendChild(b);})(i);}
+ var tm=document.createElement("button");tm.textContent="60s";tm.className="tm";tm.setAttribute("aria-label","60 second timed round");tm.onclick=function(){setTimed(!S.timed);};lv.appendChild(tm);
+ $("hint").onclick=function(){if(!S.done&&!S.timed){$("fb").innerHTML="<strong>Hint:</strong> "+S.cur.hint;}};
  var pad=$("pad"),keys=["1","2","3","4","5","6","7","8","9","del","0","go"];
  keys.forEach(function(k){var b=document.createElement("button");b.textContent=k==="del"?"⌫":k==="go"?"✓":k;b.setAttribute("aria-label",k==="del"?"Delete":k==="go"?"Submit":k);if(k==="go"){b.className="go";b.id="go";}b.onclick=function(){press(k);};pad.appendChild(b);});
  document.addEventListener("keydown",function(e){
@@ -160,7 +227,8 @@ function press(k){
   else if(e.key==="Enter"){e.preventDefault();press("go");}
  });
  var mb=$("modes").children;
- for(i=0;i<mb.length;i++){(function(n){mb[n].onclick=function(){S.dt=n===1;S.run=0;S.miss=0;S.streak=0;for(var j=0;j<mb.length;j++)mb[j].setAttribute("aria-pressed",String(j===n));paintStats();next();};})(i);}
+ for(i=0;i<mb.length;i++){(function(n){mb[n].setAttribute("aria-pressed",String(S.dt===(n===1)));mb[n].onclick=function(){S.dt=n===1;for(var j=0;j<mb.length;j++)mb[j].setAttribute("aria-pressed",String(j===n));settingsChanged();};})(i);}
+ setInterval(tick,100);
  paintStats();next();
 })();
 </script>
