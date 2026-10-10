@@ -31,6 +31,14 @@ main{max-width:460px;margin:0 auto;padding:10px 14px 14px}
 [hidden]{display:none!important}
 .topbar{display:flex;gap:6px;margin-bottom:6px}.topbar .modes{flex:1;margin-bottom:0}
 .helpbtn{width:40px;min-height:34px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;font:700 17px Oswald,sans-serif;cursor:pointer}
+.refbtn{width:48px;font-size:14px}.helpbtn:disabled{opacity:.4;cursor:default}
+.reftable{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.reftable table{border-collapse:collapse;width:100%;font:600 15px "Work Sans",sans-serif;text-align:center}
+.reftable th{font:700 14px Oswald,sans-serif;padding:4px 0;color:var(--muted)}
+.reftable td{padding:5px 0;border-top:1px solid var(--line)}
+.reftable td:first-child{font-weight:700}
+.reftable .d{color:var(--green)}.reftable .t{color:var(--red)}
+.refnote{font-size:13px;color:var(--muted);margin:0 0 10px}
 .overlay{position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:14px}
 .sheet{background:var(--panel);color:var(--ink);border:1.5px solid var(--line);border-radius:16px;width:100%;max-width:460px;max-height:86vh;max-height:86dvh;overflow:auto;padding:14px 16px 16px}
 .sheethead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -67,7 +75,7 @@ button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 </head>
 <body>
 <main>
-<div class="topbar"><div class="modes" id="modes" role="group" aria-label="Game"><button type="button" aria-pressed="true">Mixed</button><button type="button" aria-pressed="false">Doubles &amp; trebles</button></div><button type="button" class="helpbtn" id="helpbtn" aria-label="Game guide">?</button></div>
+<div class="topbar"><div class="modes" id="modes" role="group" aria-label="Game"><button type="button" aria-pressed="true">Mixed</button><button type="button" aria-pressed="false">Doubles &amp; trebles</button></div><button type="button" class="helpbtn refbtn" id="refbtn" aria-label="Doubles and trebles table">D/T</button><button type="button" class="helpbtn" id="helpbtn" aria-label="Game guide">?</button></div>
 <div class="levels" id="levels" role="group" aria-label="Level"></div>
 <div class="stats">
 <span>Score<b id="score">0</b></span>
@@ -87,6 +95,14 @@ button:focus-visible{outline:3px solid var(--red);outline-offset:2px}
 <button class="hint" id="hint" type="button">Hint</button>
 <div class="pad" id="pad"></div>
 </main>
+<div class="overlay" id="ref" hidden role="dialog" aria-modal="true" aria-labelledby="reftitle">
+<div class="sheet">
+<div class="sheethead"><h2 id="reftitle">Doubles and trebles</h2><button type="button" id="refclose" aria-label="Close table">✕</button></div>
+<p class="refnote">D = number × 2. T = number × 3.</p>
+<div class="reftable"><table><thead><tr><th>No.</th><th>D</th><th>T</th></tr></thead><tbody><tr><td>1</td><td class="d">2</td><td class="t">3</td></tr><tr><td>2</td><td class="d">4</td><td class="t">6</td></tr><tr><td>3</td><td class="d">6</td><td class="t">9</td></tr><tr><td>4</td><td class="d">8</td><td class="t">12</td></tr><tr><td>5</td><td class="d">10</td><td class="t">15</td></tr><tr><td>6</td><td class="d">12</td><td class="t">18</td></tr><tr><td>7</td><td class="d">14</td><td class="t">21</td></tr><tr><td>8</td><td class="d">16</td><td class="t">24</td></tr><tr><td>9</td><td class="d">18</td><td class="t">27</td></tr><tr><td>10</td><td class="d">20</td><td class="t">30</td></tr></tbody></table><table><thead><tr><th>No.</th><th>D</th><th>T</th></tr></thead><tbody><tr><td>11</td><td class="d">22</td><td class="t">33</td></tr><tr><td>12</td><td class="d">24</td><td class="t">36</td></tr><tr><td>13</td><td class="d">26</td><td class="t">39</td></tr><tr><td>14</td><td class="d">28</td><td class="t">42</td></tr><tr><td>15</td><td class="d">30</td><td class="t">45</td></tr><tr><td>16</td><td class="d">32</td><td class="t">48</td></tr><tr><td>17</td><td class="d">34</td><td class="t">51</td></tr><tr><td>18</td><td class="d">36</td><td class="t">54</td></tr><tr><td>19</td><td class="d">38</td><td class="t">57</td></tr><tr><td>20</td><td class="d">40</td><td class="t">60</td></tr></tbody></table></div>
+<button type="button" class="done" id="refdone">Got it</button>
+</div>
+</div>
 <div class="overlay" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helptitle">
 <div class="sheet">
 <div class="sheethead"><h2 id="helptitle">Game guide</h2><button type="button" id="helpclose" aria-label="Close guide">✕</button></div>
@@ -210,10 +226,15 @@ function paintStats(){
  var b=$("levels").children;for(var j=0;j<5;j++)b[j].setAttribute("aria-pressed",String(j+1===S.level));
  b[5].setAttribute("aria-pressed",String(S.timed));
  if(g)paintTime();
+ $("refbtn").disabled=S.timed&&S.running;
 }
 function showHelp(on){
  helpOpen=on;$("help").hidden=!on;
  if(on){$("helpclose").focus();}else{B.seen=true;saveB();}
+}
+function showRef(on){
+ helpOpen=on;$("ref").hidden=!on;
+ if(on){$("refclose").focus();}
 }
 function setTab(n){
  var t=$("tabs").children;
@@ -302,13 +323,17 @@ function press(k){
  var pad=$("pad"),keys=["1","2","3","4","5","6","7","8","9","del","0","go"];
  keys.forEach(function(k){var b=document.createElement("button");b.textContent=k==="del"?"⌫":k==="go"?"✓":k;b.setAttribute("aria-label",k==="del"?"Delete":k==="go"?"Submit":k);if(k==="go"){b.className="go";b.id="go";}b.onclick=function(){press(k);};pad.appendChild(b);});
  document.addEventListener("keydown",function(e){
-  if(helpOpen){if(e.key==="Escape")showHelp(false);return;}
+  if(helpOpen){if(e.key==="Escape"){showHelp(false);showRef(false);}return;}
   if(/^[0-9]$/.test(e.key))press(e.key);
   else if(e.key==="Backspace")press("del");
   else if(e.key==="Enter"){e.preventDefault();press("go");}
  });
  var mb=$("modes").children;
  for(i=0;i<mb.length;i++){(function(n){mb[n].setAttribute("aria-pressed",String(S.dt===(n===1)));mb[n].onclick=function(){S.dt=n===1;for(var j=0;j<mb.length;j++)mb[j].setAttribute("aria-pressed",String(j===n));settingsChanged();};})(i);}
+ $("refbtn").onclick=function(){if(!(S.timed&&S.running))showRef(true);};
+ $("refclose").onclick=function(){showRef(false);};
+ $("refdone").onclick=function(){showRef(false);};
+ $("ref").onclick=function(e){if(e.target===$("ref"))showRef(false);};
  $("helpbtn").onclick=function(){setTab(0);showHelp(true);};
  $("helpclose").onclick=function(){showHelp(false);};
  $("helpdone").onclick=function(){showHelp(false);};
